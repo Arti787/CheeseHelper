@@ -4,7 +4,7 @@ def load_config(archive_file):
     password = input("Требуется пароль от конфигурационного файла: ")
     with py7zr.SevenZipFile(archive_file, mode='r', password=password) as archive:
         archive.extract(targets=['config.toml'], path='temp')
-        with open('temp/config.toml') as f:
+        with open('temp/config.toml', encoding="utf-8", errors="ignore") as f:
             config = toml.load(f)
         # удаляем временную папку
         os.remove('temp/config.toml')
