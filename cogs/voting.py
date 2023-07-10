@@ -2,7 +2,6 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-
 class VoteButton(discord.ui.Button):
     def __init__(self, option):
         super().__init__(label=option,
@@ -20,10 +19,7 @@ class VoteButton(discord.ui.Button):
                 return
 
             view.active = False
-            embed = discord.Embed(title=view.title, description=view.description)
-            embed.set_author(name=view.author.display_name, icon_url=view.author.avatar.url)
-            embed.colour = discord.Colour.red()
-            embed.add_field(name='Результаты:', value=view.get_results())
+            embed = view.get_embed(discord.Colour.red())
             try:
                 await interaction.response.send_message('Голосование закончилось.')
             except:
@@ -39,22 +35,12 @@ class VoteButton(discord.ui.Button):
                                       ephemeral=True)
         else:
             for other_option in view.options:
-                if user in view.votes[other_option]:
-                    view.votes[other_option].remove(user)
-            view.votes[self.option].append(user)
+                view.votes[other_option].discard(user)
+            view.votes[self.option].add(user)
             await interaction.response.send_message(f'Вы проголосовали за {self.option}.',
                                       ephemeral=True)
-        embed = discord.Embed(title=view.title, description=view.description)
-        embed.set_author(name=view.author.display_name, icon_url=view.author.avatar.url)
-        embed.add_field(name='Результаты:', value=view.get_results())
+        embed = view.get_embed(discord.Colour.green())
         await interaction.message.edit(embed=embed, view=view)
-
-        if view.active:
-            embed.colour = discord.Colour.green()
-        else:
-            embed.colour = discord.Colour.red()
-        await interaction.message.edit(embed=embed, view=view)
-
 
 class VoteView(discord.ui.View):
     def __init__(self, title):
@@ -62,7 +48,7 @@ class VoteView(discord.ui.View):
         self.title = title
         self.description = None
         self.options = ['✅', '❌', '⛔']
-        self.votes = {option: [] for option in self.options}
+        self.votes = {option: set() for option in self.options}
         self.active = True
         self.message_id = None
         self.author = None
@@ -80,19 +66,19 @@ class VoteView(discord.ui.View):
             return 'Никто не проголосовал.'
         if self.active:
             return f'Всего проголосовало: {total}'
-        results = []
-        for option, votes in self.votes.items():
-            count = len(votes)
-            percent = round(count / total * 100, 2)
-            results.append(f'{option} - {count} голосов ({percent}%)')
+        results = [f'{option} - {len(votes)} голосов ({round(len(votes) / total * 100, 2)}%)' for option, votes in self.votes.items()]
         return '\n'.join(results)
+
+    def get_embed(self, colour):
+        embed = discord.Embed(title=self.title, description=self.description, colour=colour)
+        embed.set_author(name=self.author.display_name, icon_url=self.author.avatar.url)
+        embed.add_field(name='Результаты:', value=self.get_results())
+        return embed
 
 class voting(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        print("ИНИИт")
 
-    @commands.Cog.listener()
     async def on_ready(self):
         print("voiting")
 
@@ -104,8 +90,8 @@ class voting(commands.Cog):
     @app_commands.command(name="голосование", description="Начать голосование по заданной теме")
     @app_commands.describe(title="Сюда вводится тема голосования (заголовок)", description="Сюда вводится описание голосования (основная суть)")
     async def voit(self, interaction: discord.Interaction, title: str, description: str):
-        check_1 = str(interaction.user.id) in self.bot.multi_variable.admins
-        check_2 = self.bot.check_roles(interaction.user, "1,2,3,5")
+        check_1 = str(interaction.user.id) in self.bot.ctx.admins
+        check_2 = self.bot.check_roles(interaction.user, "1,2,3,5,69")
         if not(check_1 or check_2):
                 await interaction.response.send_message(f'У вас нет прав на использование данной команды', ephemeral=True)
                 return
@@ -114,18 +100,10 @@ class voting(commands.Cog):
         view.author = interaction.user
         view.description = description
         view.title = title
-        embed = discord.Embed(title=view.title, description=view.description)
-        embed.set_author(name=view.author.display_name, icon_url=view.author.avatar.url)
-        embed.colour = discord.Colour.green()
+        embed = view.get_embed(discord.Colour.green())
         message = await interaction.response.send_message(embed=embed, view=view)
         view.message_id = message.id
         self.bot.add_view(view, message_id=message.id)
 
-
 async def setup(bot: commands.Bot):
-    print("СЕТАП")
-    guilds_count = len(bot.guilds)
-    if guilds_count > 0:
-        await bot.add_cog(voting(bot), guilds=bot.guilds)
-    else:
-        await bot.add_cog(voting(bot), guilds=[discord.Object(id=889846652893011998)])
+    await bot.add_cog(voting(bot), guilds=bot.guilds)
