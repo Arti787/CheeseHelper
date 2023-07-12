@@ -2,10 +2,10 @@ import discord
 from discord import ui, app_commands
 from discord.ext import commands
 
-class UnbanModal(ui.Modal, title='Разбанить пользователя'):
+class UnbanModal(ui.Modal, title='Податься на разбан'):
     ban_date = ui.TextInput(label='Дата бана', placeholder='Введите дату бана в формате ДД.ММ.ГГГГ')
     ban_reason = ui.TextInput(label='Причина бана', placeholder='Введите причину бана, указанную при бане')
-    unban_reason = ui.TextInput(label='Причина разбана', placeholder='Введите причину разбана. Больше слов - больше шанс.', style=discord.TextStyle.paragraph)
+    unban_reason = ui.TextInput(label='Почему мы должны снять бан?', placeholder='Пишите в этом пункте всё, что посчитаете нужным. Больше слов по делу - больше шанс на разбан', style=discord.TextStyle.paragraph)
 
     async def on_submit(self, interaction: discord.Interaction):
         ban_date = self.ban_date.value
@@ -28,6 +28,11 @@ class Unban(commands.Cog):
 
     @app_commands.command(name='разбан', description='Показать модуль с небольшим опросом для разбана пользователя')
     async def unban(self, interaction: discord.Interaction):
+        check_1 = str(interaction.user.id) in self.bot.ctx.admins
+        check_2 = self.bot.check_roles(interaction.user, "1,20")
+        if not (check_1 or check_2):
+            await interaction.response.send_message(f'У вас нет прав на использование данной команды', ephemeral=True)
+            return
         view = UnbanModal()
         view.bot = self.bot
         await interaction.response.send_modal(view)

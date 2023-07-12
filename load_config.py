@@ -22,4 +22,4 @@ def load_config(archive_file):
         read_channels = server["read_channels"]["ids"]
         servers[server_id]["send"] = send_channels
         servers[server_id]["read"] = read_channels
-    return admins, servers, discord_token, openai_keys, moder_roles
+    return password, admins, servers, discord_token, openai_keys, moder_roles

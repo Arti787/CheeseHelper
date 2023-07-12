@@ -14,18 +14,27 @@ class CheeseHelper(commands.Bot):
         super().__init__(command_prefix="/", intents=discord.Intents.all())
         self.ctx = Global()
         self.ctx.config_file = config_file
-        self.ctx.admins, self.ctx.servers, self.ctx.discord_token, self.ctx.openai_keys, self.ctx.moder_roles = load_config(self.ctx.config_file)
+        self.ctx.config_pass, self.ctx.admins, self.ctx.servers, self.ctx.discord_token, self.ctx.openai_keys, self.ctx.moder_roles = load_config(self.ctx.config_file)
         self.ctx.guilds = self.guilds
+        self.ctx.VoteValues
+
+
     async def on_ready(self):
         print(f"Logged in as {self.user}")
-        await self.load_cogs()
         print(f"Guilds: {bot.guilds}")
+        await self.reload_cogs()
 
-
-    async def load_cogs(self):
+    async def setup_hook(self):
         for filename in os.listdir("./cogs"):
             if filename.endswith(".py"):
                 await self.load_extension(f"cogs.{filename[:-3]}")
+
+    async def reload_cogs(self):
+        cogs = list(bot.cogs.keys())
+        for cog in cogs:
+            cog_name = cog
+            await self.unload_extension(f"cogs.{cog_name}")
+            await self.load_extension(f"cogs.{cog_name}")
 
     # функция проверяющая приоритетность ролей пользователя (user, "1,3,5")
     def check_roles(self, user, priorities):
@@ -35,7 +44,7 @@ class CheeseHelper(commands.Bot):
             if role_id in self.ctx.moder_roles:
                 priority = self.ctx.moder_roles[role_id]
                 if priority in priority_set:
-                    return True
+                    return Trues
         return False
 
 
@@ -58,4 +67,4 @@ if __name__ == '__main__':
     bot = CheeseHelper("config.7z")
     bot.run(bot.ctx.discord_token)
     bot.ctx.guilds = bot.guilds
-    print("ФЫ")
+    print("ФЫР")
