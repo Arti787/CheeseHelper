@@ -196,8 +196,7 @@ class voting(commands.Cog):
         await ctx.send(f"Synced {len(fmt)} commands")
 
     @app_commands.command(name="голосование", description="Начать голосование по заданной теме")
-    @app_commands.describe(title="Сюда вводится тема голосования (заголовок)",
-                           description="Сюда вводится описание голосования (основная суть)")
+    @app_commands.describe(title="Сюда вводится тема голосования (заголовок)",description="Сюда вводится описание голосования (основная суть)")
     async def voit(self, interaction: discord.Interaction, title: str, description: str):
         check_1 = str(interaction.user.id) in self.bot.ctx.admins
         check_2 = self.bot.check_roles(interaction.user, "1,2,3,5,69,20")

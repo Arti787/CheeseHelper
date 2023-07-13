@@ -11,7 +11,7 @@ print(discord.__version__)
 # создаем класс бота-модератора, наследуясь от commands.Bot
 class CheeseHelper(commands.Bot):
     def __init__(self, config_file):
-        super().__init__(command_prefix="/", intents=discord.Intents.all())
+        super().__init__(command_prefix=".", intents=discord.Intents.all())
         self.ctx = Global()
         self.ctx.config_file = config_file
         self.ctx.config_pass, self.ctx.admins, self.ctx.servers, self.ctx.discord_token, self.ctx.openai_keys, self.ctx.moder_roles = load_config(self.ctx.config_file)
@@ -44,7 +44,7 @@ class CheeseHelper(commands.Bot):
             if role_id in self.ctx.moder_roles:
                 priority = self.ctx.moder_roles[role_id]
                 if priority in priority_set:
-                    return Trues
+                    return True
         return False
 
 
