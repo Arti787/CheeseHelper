@@ -43,7 +43,7 @@ class UnbanModal(ui.Modal, title='Податься на разбан'):
 # Создаем класс для кнопки принятия голосования
 class AcceptButton(ui.Button):
     def __init__(self):
-        super().__init__(label="✅", style=discord.ButtonStyle.green, custom_id="vote_YES")
+        super().__init__(label="✅", style=discord.ButtonStyle.green, custom_id="unban_YES")
 
     async def callback(self, interaction: discord.Interaction):
         view = self.view
@@ -57,7 +57,7 @@ class AcceptButton(ui.Button):
 # Создаем класс для кнопки отклонения голосования
 class RejectButton(ui.Button):
     def __init__(self):
-        super().__init__(label="❌", style=discord.ButtonStyle.red, custom_id="vote_NO")
+        super().__init__(label="❌", style=discord.ButtonStyle.red, custom_id="unban_NO")
 
     async def callback(self, interaction: discord.Interaction):
         view = self.view
@@ -122,7 +122,7 @@ class CloseTicketButton(ui.Button):
         vote_view.clear_items()
         await self.bot.ctx.unban_vote_view_interaction.message.edit(view=vote_view)
         await interaction.message.edit(view=vote_view)
-        await thread.edit(name=f"{thread.name} (закрыто)")
+        await thread.edit(name=f"(закрыто) {thread.name}")
 
 
 # Создаем класс для вида с кнопкой закрытия тикета
@@ -180,9 +180,9 @@ class Unban(commands.Cog):
             if component_interaction['custom_id'] == "close_ticket_button":
                 await CloseTicketButton.callback(self, interaction)
 
-            if component_interaction['custom_id'] == "vote_YES":
+            if component_interaction['custom_id'] == "unban_YES":
                 await AcceptButton.callback(self.vote_view.children[0], interaction)
-            if component_interaction['custom_id'] == "vote_NO":
+            if component_interaction['custom_id'] == "unban_NO":
                 await RejectButton.callback(self.vote_view.children[1], interaction)
 
 async def setup(bot: commands.Bot):
