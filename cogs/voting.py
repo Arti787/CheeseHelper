@@ -1,8 +1,57 @@
 import discord
-from discord import app_commands
+from discord import app_commands, ui
 from discord.ext import commands
 import json
 import os
+
+class AddOptionsModal(ui.Modal, title='Свои варианты'):
+    Option_1 = ui.TextInput(label='Свой вариант 1', placeholder='Введите сюда эмодзи либо короткий текст', max_length = 30, required = True)
+    Option_2 = ui.TextInput(label='Свой вариант 2', placeholder='Введите сюда эмодзи либо короткий текст', max_length = 30, required = True)
+    Option_3 = ui.TextInput(label='Свой вариант 3', placeholder='Введите сюда эмодзи либо короткий текст', max_length = 30, required = False)
+    Option_4 = ui.TextInput(label='Свой вариант 4', placeholder='Введите сюда эмодзи либо короткий текст', max_length = 30, required = False)
+    Option_5 = ui.TextInput(label='Свой вариант 5', placeholder='Введите сюда эмодзи либо короткий текст', max_length = 30, required = False)
+
+
+
+    def __init__(self, view):
+        super().__init__(timeout=None)
+        self.view = view
+
+    async def on_submit(self, interaction: discord.Interaction):
+        # Создаем список из значений опций
+        options = [self.Option_1.value, self.Option_2.value, self.Option_3.value, self.Option_4.value,
+                   self.Option_5.value]
+
+        self.view.options=[]
+        self.view.options.extend([option for option in options if option != ""])
+        self.view.votes = {option: set() for option in self.view.options}
+        self.view.clear_items()
+        VM = VoteManager(self.view.bot)
+        self.view = VM.update_view(self.view)
+
+        print(self.view.options)
+        VM = VoteManager(self.view.bot)
+        VM.save_vote(self.view)
+        embed = await self.view.get_embed(discord.Colour.green())
+        await interaction.message.edit(embed=embed, view=self.view)
+        await interaction.response.send_message(f'Вы успешно задали кастомные опции голосования',ephemeral=True)
+
+
+class TitleDescriptionModal(ui.Modal, title='Ваше голосование'):
+    Title = ui.TextInput(label='Заголовок', placeholder='Обозначте тему голосования', max_length = 100, required = True)
+    Description = ui.TextInput(label='Описание', placeholder='Распишите ваше голосование подробнее :3', max_length = 2000, required = False)
+
+    def __init__(self, view):
+        super().__init__(timeout=None)
+        self.view = view
+
+    async def on_submit(self, interaction: discord.Interaction):
+        self.view.author_id = interaction.user.id
+        self.view.title = self.Title.value
+        self.view.description = self.Description.value
+        embed = await self.view.get_embed(discord.Colour.green())
+        await interaction.response.send_message(embed=embed, view=self.view)
+
 
 class VoteManager:
     def __init__(self, bot, filename="votes.json"):
@@ -53,6 +102,22 @@ class VoteManager:
                 vote.author_id = vote_dict["author_id"]
                 return vote
         return None
+    def update_view(self, view):
+
+        for option in view.options:
+            button = VoteButton(option)
+            view.add_item(button)
+
+        settings_button = VoteButton('🔧')
+        settings_button.custom_id = 'vote_🔧'
+        settings_button.style = discord.ButtonStyle.blurple
+        view.add_item(settings_button)
+
+        end_button = VoteButton('Закончить голосование')
+        end_button.custom_id = 'vote_end'
+        end_button.style = discord.ButtonStyle.blurple
+        view.add_item(end_button)
+        return view
 
 
 class VoteButton(discord.ui.Button):
@@ -72,15 +137,30 @@ class VoteButton(discord.ui.Button):
                                                         ephemeral=True)
                 return
 
-            view.active = False
             VM = VoteManager(view.bot)
             VM.save_vote(view)
-            embed = await view.get_embed(discord.Colour.red())
-            await interaction.response.send_message('Голосование закончилось.')
-
+            total_votes = sum(len(votes) for votes in view.votes.values())
+            try:
+                max_percent = max(len(votes) / total_votes for votes in view.votes.values())
+            except:
+                await interaction.response.send_message(f'Нельзя закончить голосование, пока никто не проголосовал',ephemeral=True)
+                return
+            max_options = [option for option, votes in view.votes.items() if len(votes) / total_votes == max_percent]
+            max_option = max_options[0]
+            max_votes = len(view.votes[max_option])
+            view.active = False
             view.clear_items()
+            embed = await view.get_embed(discord.Colour.red())
             await interaction.message.edit(embed=embed, view=view)
+            await interaction.response.send_message(f'Голосование "**{view.title}**" закончилось.\nВыигравший результат: "**{max_option}**"\nГолосов за него: **{max_votes}** ({max_percent * 100}%)')
             return
+
+        if self.custom_id == 'vote_🔧':
+            if user.id != view.author_id:
+                await interaction.response.send_message(f'Вы не являетесь автором голосования.',
+                                                        ephemeral=True)
+                return
+            await interaction.response.send_modal(AddOptionsModal(view))
 
         if user.id in view.votes[self.option]:
             view.votes[self.option].remove(user.id)
@@ -98,23 +178,20 @@ class VoteButton(discord.ui.Button):
         await interaction.message.edit(embed=embed, view=view)
 
 class VoteView(discord.ui.View):
-    def __init__(self, bot):
+    def __init__(self, bot, options = ['✅', '❌', '⛔']):
         super().__init__(timeout=None)
         self.bot = bot
         self.title = None
         self.description = None
-        self.options = ['✅', '❌', '⛔']
-        self.votes = {option: set() for option in self.options}
+        self.options = options
+        self.custom_options = []
         self.active = True
         self.message_id = None
         self.author_id = None
-        for option in self.options:
-            button = VoteButton(option)
-            self.add_item(button)
-        end_button = VoteButton('Закончить голосование')
-        end_button.custom_id = 'vote_end'
-        end_button.style = discord.ButtonStyle.blurple
-        self.add_item(end_button)
+        self.votes = {option: set() for option in self.options}
+        VM = VoteManager(self.bot)
+        self.clear_items()
+        VM.update_view(self)
 
     def get_results(self):
         total = sum(len(votes) for votes in self.votes.values())
@@ -129,7 +206,13 @@ class VoteView(discord.ui.View):
         user = await self.bot.fetch_user(self.author_id)
         embed = discord.Embed(title=self.title, description=self.description, colour=colour)
         embed.set_author(name=user.display_name, icon_url=user.avatar.url)
-        embed.add_field(name='Результаты:', value=self.get_results())
+        if self.active == True:
+            status = "Продолжается"
+        else:
+            status = "Закончилось"
+        status = f"\n\nСтатус голосования:\n**{status}**"
+
+        embed.add_field(name='Результаты:', value=self.get_results() + status)
         return embed
 
 
@@ -149,12 +232,13 @@ class voting(commands.Cog):
             if component_interaction_data.find("vote_", 0)  != -1:
                 VM = VoteManager(self.bot)
                 view = VM.load_vote(interaction.message.id)
+                view.clear_items()
+                view = VM.update_view(view)
                 if view != None:
                     for i in range(len(view.children)):
                         value = view.children[i]
                         if value.custom_id == component_interaction_data:
                             await VoteButton.callback(view.children[i], interaction)
-
 
     @commands.command()
     async def sync(self, ctx):
@@ -162,20 +246,14 @@ class voting(commands.Cog):
         await ctx.send(f"Synced {len(fmt)} commands")
 
     @app_commands.command(name="голосование", description="Начать голосование по заданной теме")
-    @app_commands.describe(title="Сюда вводится тема голосования (заголовок)", description="Сюда вводится описание голосования (основная суть)")
-    async def voit(self, interaction: discord.Interaction, title: str, description: str):
+    async def voit(self, interaction: discord.Interaction):
         check_1 = str(interaction.user.id) in self.bot.ctx.admins
-        check_2 = self.bot.check_roles(interaction.user, "1,2,3,5,69")
+        check_2 = self.bot.check_roles(interaction.user, "6,69,20")
         if not(check_1 or check_2):
                 await interaction.response.send_message(f'У вас нет прав на использование данной команды', ephemeral=True)
                 return
-
         view = VoteView(self.bot)
-        view.author_id = interaction.user.id
-        view.description = description
-        view.title = title
-        embed = await view.get_embed(discord.Colour.green())
-        message = await interaction.response.send_message(embed=embed, view=view)
+        await interaction.response.send_modal(TitleDescriptionModal(view))
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(voting(bot), guilds=bot.guilds)
