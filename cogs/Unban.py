@@ -303,13 +303,13 @@ class CloseTicketButton(ui.Button):
             try:
                 await server.unban(user)  # разбанить пользователя на сервере
                 await interaction.channel.send(f'Пользователь {user.name}(id: {user.id}) успешно разблокирован на сервере {server.name}')  # отправить сообщение об успешном разбане
+                await user.send(f'Фыр, тебя разбанили на сервере {server.name}, держи ссылку: https://discord.gg/WcNTDvgCT9')  # отправить сообщение пользователю в личку
                 break  # прервать цикл
             except discord.NotFound:
                 continue  # перейти к следующему серверу
             except discord.Forbidden:
                 await interaction.channel.send(f"У бота нет разрешения на разбан пользователя {user.mention} на сервере {server.name}")  # отправить сообщение об ошибке
                 break  # прервать цикл
-
 
 
 # Создаем класс для вида с кнопкой закрытия тикета
