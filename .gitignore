@@ -1,3 +1,4 @@
 **/__pycache__/
 
+*.json
 #git rm --cached */__pycache__/*

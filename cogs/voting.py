@@ -5,13 +5,11 @@ import json
 import os
 
 class AddOptionsModal(ui.Modal, title='Свои варианты'):
-    Option_1 = ui.TextInput(label='Свой вариант 1', placeholder='Введите сюда эмодзи либо короткий текст', max_length = 30, required = True)
-    Option_2 = ui.TextInput(label='Свой вариант 2', placeholder='Введите сюда эмодзи либо короткий текст', max_length = 30, required = True)
-    Option_3 = ui.TextInput(label='Свой вариант 3', placeholder='Введите сюда эмодзи либо короткий текст', max_length = 30, required = False)
-    Option_4 = ui.TextInput(label='Свой вариант 4', placeholder='Введите сюда эмодзи либо короткий текст', max_length = 30, required = False)
-    Option_5 = ui.TextInput(label='Свой вариант 5', placeholder='Введите сюда эмодзи либо короткий текст', max_length = 30, required = False)
-
-
+    Option_1 = ui.TextInput(label='Вариант 1', placeholder='Введите сюда эмодзи либо короткий текст', max_length = 30, required = True)
+    Option_2 = ui.TextInput(label='Вариант 2', placeholder='Введите сюда эмодзи либо короткий текст', max_length = 30, required = True)
+    Option_3 = ui.TextInput(label='Вариант 3', placeholder='Введите сюда эмодзи либо короткий текст', max_length = 30, required = False)
+    Option_4 = ui.TextInput(label='Вариант 4', placeholder='Введите сюда эмодзи либо короткий текст', max_length = 30, required = False)
+    Option_5 = ui.TextInput(label='Дополнительные варианты', placeholder='Введите сюда доп. варианты через запятую', max_length = 150, required = False)
 
     def __init__(self, view):
         super().__init__(timeout=None)
@@ -19,11 +17,15 @@ class AddOptionsModal(ui.Modal, title='Свои варианты'):
 
     async def on_submit(self, interaction: discord.Interaction):
         # Создаем список из значений опций
-        options = [self.Option_1.value, self.Option_2.value, self.Option_3.value, self.Option_4.value,
-                   self.Option_5.value]
+        options = [self.Option_1.value, self.Option_2.value, self.Option_3.value, self.Option_4.value]
+        if self.Option_5.value: # если есть дополнительные варианты
+            options.extend(self.Option_5.value.split(',')) # добавляем их к списку
+        options = [option.strip() for option in options] # убираем пробелы в начале и конце каждого варианта
+        options = [option for option in options if option != ""] # убираем пустые варианты
+        options = list(dict.fromkeys(options)) # убираем повторяющиеся варианты
 
         self.view.options=[]
-        self.view.options.extend([option for option in options if option != ""])
+        self.view.options.extend(options)
         self.view.votes = {option: set() for option in self.view.options}
         self.view.clear_items()
         VM = VoteManager(self.view.bot)
@@ -143,7 +145,8 @@ class VoteButton(discord.ui.Button):
             try:
                 max_percent = max(len(votes) / total_votes for votes in view.votes.values())
             except:
-                await interaction.response.send_message(f'Нельзя закончить голосование, пока никто не проголосовал',ephemeral=True)
+                await interaction.response.send_message(f'Нельзя закончить голосование, пока никто не проголосовал',
+                                                        ephemeral=True)
                 return
             max_options = [option for option, votes in view.votes.items() if len(votes) / total_votes == max_percent]
             max_option = max_options[0]
@@ -152,8 +155,36 @@ class VoteButton(discord.ui.Button):
             view.clear_items()
             embed = await view.get_embed(discord.Colour.red())
             await interaction.message.edit(embed=embed, view=view)
-            await interaction.response.send_message(f'Голосование "**{view.title}**" закончилось.\nВыигравший результат: "**{max_option}**"\nГолосов за него: **{max_votes}** ({max_percent * 100}%)')
-            return
+
+            if len(max_options) == len(view.options):  # если все варианты набрали одинаковое кол-во голосов
+                embed = discord.Embed(title=f'Голосование "**{view.title}**" закончилось.',
+                                      description=f'Нет явного победителя, все варианты получили по **{max_votes}** голосов.',
+                                      color=discord.Color.orange())
+                await interaction.response.send_message(embed=embed)
+                return
+            elif len(max_options) > 1:  # если некоторые варианты набрали одинаковое кол-во голосов
+                winners = ', '.join(f'"**{option}**"' for option in max_options)
+                embed = discord.Embed(title=f'Голосование "**{view.title}**" закончилось.',
+                                      description=f'Есть несколько победителей: {winners}\nГолосов за каждого из них: **{max_votes}** ({round(max_percent * 100, 1)}%)',
+                                      color=discord.Color.green())
+                await interaction.response.send_message(embed=embed)
+                return
+            else:  # если есть один победитель
+                second_percent = sorted(len(votes) / total_votes for votes in view.votes.values())[
+                    -2]  # процент голосов за второй вариант
+                diff_percent = max_percent - second_percent  # разница в процентах между первым и вторым вариантом
+                if diff_percent < 0.15:  # если разница меньше 15%
+                    embed = discord.Embed(title=f'Голосование "**{view.title}**" закончилось.',
+                                          description=f'Выигравший результат: "**{max_option}**"\nГолосов за него: **{max_votes}** ({round(max_percent * 100, 1)}%)\nОн оторвался от ближайшего соперника **{max_options[1]}** всего на {round(diff_percent * 100, 1)}%',
+                                          color=discord.Color.blue())
+                    await interaction.response.send_message(embed=embed)
+                    return
+                else:  # если разница больше или равна 10%
+                    embed = discord.Embed(title=f'Голосование "**{view.title}**" закончилось.',
+                                          description=f'Выигравший результат: "**{max_option}**"\nГолосов за него: **{max_votes}** ({round(max_percent * 100, 1)}%)',
+                                          color=discord.Color.purple())
+                    await interaction.response.send_message(embed=embed)
+                    return
 
         if self.custom_id == 'vote_🔧':
             if user.id != view.author_id:
@@ -164,13 +195,13 @@ class VoteButton(discord.ui.Button):
 
         if user.id in view.votes[self.option]:
             view.votes[self.option].remove(user.id)
-            await interaction.response.send_message(f'Вы отменили свой голос за {self.option}.',
+            await interaction.response.send_message(f'Вы отменили свой голос за "**{self.option}**".',
                                       ephemeral=True)
         else:
             for other_option in view.options:
                 view.votes[other_option].discard(user.id)
             view.votes[self.option].add(user.id)
-            await interaction.response.send_message(f'Вы проголосовали за {self.option}.',
+            await interaction.response.send_message(f'Вы проголосовали за "**{self.option}**".',
                                       ephemeral=True)
         VM = VoteManager(view.bot)
         VM.save_vote(view)
@@ -224,22 +255,6 @@ class voting(commands.Cog):
     async def on_ready(self):
         print("voiting")
 
-    @commands.Cog.listener()
-    async def on_interaction(self, interaction: discord.Interaction):
-        if interaction.type == discord.InteractionType.component:
-            component_interaction_data = interaction.data['custom_id']
-
-            if component_interaction_data.find("vote_", 0)  != -1:
-                VM = VoteManager(self.bot)
-                view = VM.load_vote(interaction.message.id)
-                view.clear_items()
-                view = VM.update_view(view)
-                if view != None:
-                    for i in range(len(view.children)):
-                        value = view.children[i]
-                        if value.custom_id == component_interaction_data:
-                            await VoteButton.callback(view.children[i], interaction)
-
     @commands.command()
     async def sync(self, ctx):
         fmt = await ctx.bot.tree.sync(guild=ctx.guild)
@@ -254,6 +269,7 @@ class voting(commands.Cog):
                 return
         view = VoteView(self.bot)
         await interaction.response.send_modal(TitleDescriptionModal(view))
+
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(voting(bot), guilds=bot.guilds)
