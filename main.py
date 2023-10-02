@@ -14,10 +14,8 @@ class CheeseHelper(commands.Bot):
         super().__init__(command_prefix=".", intents=discord.Intents.all())
         self.ctx = Global()
         self.ctx.config_file = config_file
-        self.ctx.config_pass, self.ctx.admins, self.ctx.servers, self.ctx.discord_token, self.ctx.openai_keys, self.ctx.moder_roles = load_config(self.ctx.config_file)
+        self.ctx.config_pass, self.ctx.admins, self.ctx.servers, self.ctx.discord_token, self.ctx.openai_keys, self.ctx.moder_roles, self.ctx.unban_guild_ids, self.ctx.appeal_channel_id, self.ctx.welcome_thread_channel_id, self.ctx.docs_transfer_report_channel_id, self.ctx.docs_transfer_spreadsheet_key = load_config(self.ctx.config_file)
         self.ctx.guilds = self.guilds
-        self.ctx.VoteValues
-
 
     async def on_ready(self):
         print(f"Logged in as {self.user}")
@@ -53,15 +51,18 @@ class CheeseHelper(commands.Bot):
             return
         if str(message.author.id) in self.ctx.admins:
             await self.process_commands(message)
-        if message.channel.id in self.ctx.servers[message.guild.id]["read"]:
-            print(f"{message.author}: {message.content}")
-            if message.content == "GGAB":
-                report_channel = self.get_channel(self.ctx.servers[message.guild.id]["send"])
-                await report_channel.send("Hello World")
-                for admin_id, status in self.ctx.admins.items():
-                    if status:
-                        admin = await self.fetch_user(admin_id)
-                        await admin.send("Hello World")
+        try:
+            if message.channel.id in self.ctx.servers[message.guild.id]["read"]:
+                print(f"{message.author}: {message.content}")
+                if message.content == "GGAB":
+                    report_channel = self.get_channel(self.ctx.servers[message.guild.id]["send"])
+                    await report_channel.send("Hello World")
+                    for admin_id, status in self.ctx.admins.items():
+                        if status:
+                            admin = await self.fetch_user(admin_id)
+                            await admin.send("Hello World")
+        except:
+            None
 
 if __name__ == '__main__':
     bot = CheeseHelper("config.7z")

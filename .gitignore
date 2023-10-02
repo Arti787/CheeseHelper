@@ -1,4 +1,4 @@
 **/__pycache__/
-
 *.json
+config.7z
 #git rm --cached */__pycache__/*

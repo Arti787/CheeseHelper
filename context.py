@@ -7,5 +7,9 @@ class Global:
         self.discord_token = None  # говорит само за себя
         self.openai_keys = None  # как и это
         self.moder_roles = None  # массив с id ролей модеров и их приоритетом
-        self.VoteValues = {}  # Словарь с информацией по голосованиям (колво голосов, автор, участники голосования и прочее)
         self.guilds = None  # массив чисто с id серваков на котором есть бот и ещё всякой инфой(кол-во участников и прочее)
+        self.unban_guild_ids = None  # массив с idшниками guild для тикетов на Разбан
+        self.appeal_channel_id = None  # это id канала в который постится эмбед с кнопкой для подачи апеляции на разбан
+        self.welcome_thread_channel_id = None  # это id канала под которым оздаются приветные ветки с анкетами разбана
+        self.docs_transfer_report_channel_id = None  # это id канала отчётов
+        self.docs_transfer_spreadsheet_key = None  # это ключ идентефикатора таблицы на которую загружаются отчёты

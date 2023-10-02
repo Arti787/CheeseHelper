@@ -50,13 +50,21 @@ class TitleDescriptionModal(ui.Modal, title='Ваше голосование'):
     async def on_submit(self, interaction: discord.Interaction):
         self.view.author_id = interaction.user.id
         self.view.title = self.Title.value
-        self.view.description = self.Description.value
+        if self.view.roles is not None:
+            # Преобразуем список ролей в строку
+            roles_str = ', '.join(f'<@&{role}>' for role in self.view.roles)
+            if len(self.view.roles) > 1:
+                self.view.description = f'К голосованию доступны лишь пользователи с ролями {roles_str}\n{self.Description.value}'
+            else:
+                self.view.description = f'К голосованию доступны лишь пользователи с ролью {roles_str}\n{self.Description.value}'
+        else:
+            self.view.description = self.Description.value
         embed = await self.view.get_embed(discord.Colour.green())
         await interaction.response.send_message(embed=embed, view=self.view)
 
 
 class VoteManager:
-    def __init__(self, bot, filename="votes.json"):
+    def __init__(self, bot, filename="data/votes.json"):
         self.filename = filename
         self.bot = bot
 
@@ -73,7 +81,8 @@ class VoteManager:
             "votes": {option: list(vote.votes[option]) for option in vote.options},
             "active": vote.active,
             "message_id": vote.message_id,
-            "author_id": vote.author_id
+            "author_id": vote.author_id,
+            "roles": vote.roles
         }
         found = False
         for i in range(len(data)):
@@ -102,10 +111,15 @@ class VoteManager:
                 vote.active = vote_dict["active"]
                 vote.message_id = vote_dict["message_id"]
                 vote.author_id = vote_dict["author_id"]
+                if 'roles' in vote_dict and isinstance(vote_dict['roles'], list):
+                    vote.roles = vote_dict['roles']
+                else:
+                    vote.roles = None
+
                 return vote
         return None
-    def update_view(self, view):
 
+    def update_view(self, view):
         for option in view.options:
             button = VoteButton(option)
             view.add_item(button)
@@ -119,6 +133,7 @@ class VoteManager:
         end_button.custom_id = 'vote_end'
         end_button.style = discord.ButtonStyle.blurple
         view.add_item(end_button)
+
         return view
 
 
@@ -139,8 +154,6 @@ class VoteButton(discord.ui.Button):
                                                         ephemeral=True)
                 return
 
-            VM = VoteManager(view.bot)
-            VM.save_vote(view)
             total_votes = sum(len(votes) for votes in view.votes.values())
             try:
                 max_percent = max(len(votes) / total_votes for votes in view.votes.values())
@@ -150,8 +163,15 @@ class VoteButton(discord.ui.Button):
                 return
             max_options = [option for option, votes in view.votes.items() if len(votes) / total_votes == max_percent]
             max_option = max_options[0]
+
+            sorted_votes = sorted(view.votes.items(), key=lambda x: len(x[1]), reverse=True)
+
+            sorted_options = [option for option, votes in sorted_votes]
+
             max_votes = len(view.votes[max_option])
             view.active = False
+            VM = VoteManager(view.bot)
+            VM.save_vote(view)
             view.clear_items()
             embed = await view.get_embed(discord.Colour.red())
             await interaction.message.edit(embed=embed, view=view)
@@ -175,7 +195,7 @@ class VoteButton(discord.ui.Button):
                 diff_percent = max_percent - second_percent  # разница в процентах между первым и вторым вариантом
                 if diff_percent < 0.15:  # если разница меньше 15%
                     embed = discord.Embed(title=f'Голосование "**{view.title}**" закончилось.',
-                                          description=f'Выигравший результат: "**{max_option}**"\nГолосов за него: **{max_votes}** ({round(max_percent * 100, 1)}%)\nОн оторвался от ближайшего соперника **{max_options[1]}** всего на {round(diff_percent * 100, 1)}%',
+                                          description=f'Выигравший результат: "**{max_option}**"\nГолосов за него: **{max_votes}** ({round(max_percent * 100, 1)}%)\nОн оторвался от ближайшего варианта **{sorted_options[1]}** всего на {round(diff_percent * 100, 1)}%',
                                           color=discord.Color.blue())
                     await interaction.response.send_message(embed=embed)
                     return
@@ -192,6 +212,13 @@ class VoteButton(discord.ui.Button):
                                                         ephemeral=True)
                 return
             await interaction.response.send_modal(AddOptionsModal(view))
+
+        if view.roles != None:
+            view_roles = [discord.utils.get(interaction.guild.roles, id=role_id) for role_id in view.roles]
+
+            if view_roles is not None and not all(role in interaction.user.roles for role in view_roles):
+                await interaction.response.send_message('У вас нет прав на это голосование.', ephemeral=True)
+                return
 
         if user.id in view.votes[self.option]:
             view.votes[self.option].remove(user.id)
@@ -220,6 +247,7 @@ class VoteView(discord.ui.View):
         self.message_id = None
         self.author_id = None
         self.votes = {option: set() for option in self.options}
+        self.roles = None
         VM = VoteManager(self.bot)
         self.clear_items()
         VM.update_view(self)
@@ -260,14 +288,53 @@ class voting(commands.Cog):
         fmt = await ctx.bot.tree.sync(guild=ctx.guild)
         await ctx.send(f"Synced {len(fmt)} commands")
 
+    @commands.Cog.listener()
+    async def on_interaction(self, interaction: discord.Interaction):
+        if interaction.type == discord.InteractionType.component:
+            component_interaction_data = interaction.data['custom_id']
+
+            if component_interaction_data.find("vote_", 0) != -1:
+                VM = VoteManager(self.bot)
+                view = VM.load_vote(interaction.message.id)
+                view.clear_items()
+                view = VM.update_view(view)
+                if view != None:
+                    for i in range(len(view.children)):
+                        value = view.children[i]
+                        if value.custom_id == component_interaction_data:
+                            await VoteButton.callback(view.children[i], interaction)
+
     @app_commands.command(name="голосование", description="Начать голосование по заданной теме")
-    async def voit(self, interaction: discord.Interaction):
+    @app_commands.describe(role="Укажите через запятую все роли, которые имеют возможность голосовать")
+    async def voit(self, interaction: discord.Interaction, role: str = None):
         check_1 = str(interaction.user.id) in self.bot.ctx.admins
-        check_2 = self.bot.check_roles(interaction.user, "6,69,20")
-        if not(check_1 or check_2):
-                await interaction.response.send_message(f'У вас нет прав на использование данной команды', ephemeral=True)
-                return
+        check_2 = self.bot.check_roles(interaction.user, "6")
+        if not (check_1 or check_2):
+            await interaction.response.send_message(f'У вас нет прав на использование данной команды', ephemeral=True)
+            return
         view = VoteView(self.bot)
+        if role is not None:
+            role_ids = [role_id.strip() for role_id in role.split(',')]
+
+            guild = interaction.guild
+            role = []
+            for role_id in role_ids:
+                try:
+                    role_id = int(role_id)
+                    if discord.utils.get(guild.roles, id=role_id) is not None:
+                        role.append(role_id)
+                except ValueError:
+                    continue
+
+            role = list(set(role))
+
+            if not role:
+                role = None
+        else:
+            role = None
+
+        view.roles = role
+
         await interaction.response.send_modal(TitleDescriptionModal(view))
 
 

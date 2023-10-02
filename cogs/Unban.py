@@ -6,7 +6,7 @@ import json
 import os
 
 class VoteManager:
-    def __init__(self, bot, filename="unban_votes.json"):
+    def __init__(self, bot, filename="data/unban_votes.json"):
         self.filename = filename
         self.bot = bot
 
@@ -91,7 +91,7 @@ class UnbanModal(ui.Modal, title='Податься на разбан'):
         ban_reason = self.ban_reason.value
         unban_reason = self.unban_reason.value
 
-        with open("unban_votes.json", "r", encoding="utf-8") as f:
+        with open("data/unban_votes.json", "r", encoding="utf-8") as f:
             data = json.load(f)
 
         if str(interaction.user.id) in str(data):
@@ -99,8 +99,8 @@ class UnbanModal(ui.Modal, title='Податься на разбан'):
             return
 
         await interaction.response.send_message(f'Спасибо за ваш ответ!', ephemeral=True)
-        # Создаем приватную ветку в категории с id 1111696778862014524
-        category = self.bot.get_channel(1111696778862014524)
+        # Создаем приватную ветку в заданной категории
+        category = self.bot.get_channel(self.bot.ctx.welcome_thread_channel_id)
         if category is not None:
             thread = await category.create_thread(name=f"Тикет {interaction.user.display_name}", type=discord.ChannelType.private_thread)
             # Попытаться получить объект участника по его идентификатору
@@ -248,17 +248,7 @@ class CloseTicketButton(ui.Button):
                 await thread.remove_user(member)
         '''
 
-        guild_ids = [
-            691788414101618819,  # Сай и его Фыр
-            856978727972110356,  # Майнкрафт сервер
-            865194554252591104,  # Хаб общий
-            975557824287506443,  # Хорни сервер
-            880581161133416480,  # Арт мастер
-            795643820800213012,  # РП сервер
-            932050265975193611,  # Сервер забаненых
-            1114227136199405591, # Сервер Тестирование бота CheeseHelper
-            1142152375440785410  # Сервер БАНОВ
-        ]
+        guild_ids = self.bot.ctx.unban_guild_ids
         yes_count = len(vote_view.votes["✅"])
         no_count = len(vote_view.votes["❌"])
         total_role = len(vote_view.votes)
@@ -353,8 +343,8 @@ class Unban(commands.Cog):
         view = OpenTicketView(self.bot)
 
         embed = discord.Embed(title="Нажми на кнопку, чтобы открыть тикет на аппеляцию", colour=discord.Colour.from_rgb(0, 214, 255))
-        # Отправляем ембед и вид в канал с id 1111696778862014524
-        channel = self.bot.get_channel(1111696778862014524)
+        # Отправляем ембед и вид в заданный канал
+        channel = self.bot.get_channel(self.bot.ctx.appeal_channel_id)
         if channel is not None:
             await channel.send(embed=embed, view=view)
 
