@@ -47,6 +47,7 @@ class CheeseHelper(commands.Bot):
 
 
     async def on_message(self, message):
+        #print(message)
         if message.author == self.user:
             return
         if str(message.author.id) in self.ctx.admins:

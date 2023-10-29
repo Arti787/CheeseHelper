@@ -1,4 +1,8 @@
 **/__pycache__/
+**/art_folder/
+**/off_cogs/
+**/data/
 *.json
-config.7z
+*.session
+config.toml
 #git rm --cached */__pycache__/*
