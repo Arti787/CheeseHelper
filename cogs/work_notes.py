@@ -218,7 +218,7 @@ async def add_work_log(bot:commands.Bot, work_name, user_id=None, group_name=Non
         embed.set_author(name=user.name, icon_url=user.avatar)
     else: embed.title = "Выдана работа группе"
     
-    if user_id: embed.description += f'Пользователь: {user_id} \n'
+    if user_id: embed.description += f'Пользователь: <@{user_id}> \n'
     elif group_name: 
         embed.description += f'Группа: `{group_name}` \n'
         g_users = WORK_CONTROL.datafile['groups'][group_name]['users']
